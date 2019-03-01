@@ -1,67 +1,39 @@
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashSet;
-use std::iter;
 
-/************************
- * QUESTION FOR MENTORS:
- *
- * I am not really satisfied with the time complexity of this solution,
- * which runs in O(n^2) where n is the size of the sum of triplets.
- *
- * I investigated more efficient solutions based on the method for constructing
- * triplets from 2 integers m and n.
- *
- * See:
- *  - https://www.mathsisfun.com/numbers/pythagorean-triples.html
- *  - https://www.geeksforgeeks.org/generate-pythagorean-triplets/,
- *
- * However, these solutions failed the test cases for sums 90, 840, and 30000, for which
- * m and n have non-integer values. As such, I could not figure out a way to enumerate
- * values of m and n that would exhaustively produce triplets from the test cases.
- *
- * (I also had questions as to how to analyze the time complexity,
- *  and find a suitable upper bound for m in this strategy.)
- *
- * If you have any hints on how to solve the problem more efficiently, or could
- * set my mind at ease that a more efficient solution is not possible, I would appreciate it.
- *
- * :)
- *
- ************************/
-
-/// Given the sum `sum`,
-/// - return all possible Pythagorean triplets, which produce the said sum
-/// - or an empty HashSet if there are no such triplets.
-/// - Note that you are expected to return triplets in [a, b, c] order, where a < b < c
+/// Given the sum `sum`,return
+/// - all possible Pythagorean triplets, which produce the said sum
+/// - an empty HashSet if there are no such triplets.
+///
+/// we factor the pythagorean theorum from a^2 + b^2 = c^2
+/// to isolate b and c in terms of a and "sum", where "sum" = a + b + c:
+///
+/// c = sum - a - b
+/// b = ((b + c)^2 - a^2) / 2(b + c)
+///   = ((sum -a)^2) - a^2 / 2(sum - a + c)
+///
 pub fn find(sum: u32) -> HashSet<[u32; 3]> {
-    (1..sum)
-        .flat_map(|b| {
-            (1..b)
-                .zip(iter::repeat(b))
-                .filter_map(|(a, b)| find_triplet(a as f64, b as f64, sum as f64))
+    (1_u32..(sum / 3_u32))
+        .into_par_iter()
+        .map(|a| {
+            let (b, remainder) = calculate_b_and_remainder(a, sum - a, sum);
+            let c = sum - a - b;
+
+            if is_valid(a, b, c, remainder) {
+                Some([a, b, c])
+            } else {
+                None
+            }
         })
+        .filter_map(|x| x)
         .collect()
 }
 
-fn find_triplet(a: f64, b: f64, sum: f64) -> Option<[u32; 3]> {
-    let c = ((a * a) + (b * b)).sqrt();
-    if a + b + c == sum {
-        Some([a as u32, b as u32, c as u32])
-    } else {
-        None
-    }
+fn calculate_b_and_remainder(a: u32, b_plus_c: u32, sum: u32) -> (u32, u32) {
+    let (numerator, denominator) = ((b_plus_c).pow(2) - a.pow(2), 2 * b_plus_c);
+    (numerator / denominator, numerator % denominator)
 }
 
-/*
-  // imperative version
-  pub fn find(sum: u32) -> HashSet<[u32]> {
-    let mut triplets = HashSet::<[u32; 3]>::new();
-    for b in 1..sum {
-        for a in 1..b {
-            if let Some(triplet) = find_triplet(a as f64, b as f64, sum as f64) {
-                triplets.insert(triplet);
-            }
-        }
-    }
-    triplets
+fn is_valid(a: u32, b: u32, c: u32, remainder: u32) -> bool {
+    remainder == 0 && a < b && b < c
 }
- */
